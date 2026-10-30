@@ -187,6 +187,18 @@ GLGizmoMmuSegmentation::GLGizmoMmuSegmentation(GLCanvas3D& parent, const std::st
 {
 }
 
+void GLGizmoMmuSegmentation::gizmo_event(){
+if (m_auto_painter && m_auto_painter->detail_sensitivity_brush_active && mouse_down) {
+    m_auto_painter->on_brush_stroke(
+        mo->volumes.front()->mesh().its,
+        Vec3f(hit_pos.x(), hit_pos.y(), hit_pos.z()),
+        m_cursor_radius
+    );
+    return true;
+}
+    
+}
+
 void GLGizmoMmuSegmentation::render_painter_gizmo()
 {
     const Selection& selection = m_parent.get_selection();
@@ -660,6 +672,33 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
         }
     }
 
+    if (!m_auto_painter) {
+        m_auto_painter = std::make_unique<OrcaAutoPainterGizmoController>();
+    }
+
+    const ModelObject* mo = m_c->selection_info()->model_object();
+    if (mo && !mo->volumes.empty()) {
+    const indexed_triangle_set& its = mo->volumes.front()->mesh().its;
+
+    // Collect currently configured AMS / Extruder filament names and hex colors
+    std::vector<FilamentSlot> filaments;
+    for (size_t i = 0; i < m_extruders_colors.size(); ++i) {
+        FilamentSlot slot;
+        slot.extruder_id = static_cast<int>(i + 1);
+        slot.name = "Filament " + std::to_string(i + 1);
+        slot.hex_color = encode_color(m_extruders_colors[i]);
+        filaments.push_back(slot);
+    }
+
+    m_auto_painter->render_imgui_controls(
+        its,
+        m_triangle_selectors,
+        filaments,
+        [this]() { Plater::TakeSnapshot snapshot(wxGetApp().plater(), _L("AI Auto-Paint")); },
+        [this]() { update_model_from_selectors(); }
+    );
+    }
+
     ImGui::Separator();
 
     render_tooltip_button(x, y);
@@ -693,6 +732,8 @@ void GLGizmoMmuSegmentation::on_render_input_window(float x, float y, float bott
 
     // BBS
     ImGuiWrapper::pop_toolbar_style();
+
+    
 }
 
 
